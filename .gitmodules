@@ -1,0 +1,11 @@
+[submodule "external/monero"]
+	path = external/monero
+	url = https://github.com/monero-project/monero.git
+	branch = release-v0.18
+[submodule "external/libexpat"]
+	path = external/libexpat
+	url = https://github.com/libexpat/libexpat.git
+[submodule "external/unbound"]
+	path = external/unbound
+	url = https://github.com/NLnetLabs/unbound.git
+	branch = branch-1.22.0
