@@ -63,6 +63,7 @@ do_session(
 		catch(const std::exception& e)
 		{
 			std::cerr << "Error: " << e.what() << std::endl;
+			break;
 		}
 	}
 
@@ -124,6 +125,7 @@ int main(int argc, char* argv[])
 		auto wallet = std::make_unique<tools::wallet2>(network_type, 1, true);
 		wallet->load(path, password);
 		wallet->init(node_url);
+		std::cout << "Info: address: " << wallet->get_address_as_str() << '\n';
 
 		for(;;)
 		{
