@@ -40,22 +40,27 @@ bool replace_all(std::string& inout, const std::map<std::string_view,std::string
 	return result;
 }
 
-bool is_valid(std::string_view auth, tools::wallet2& wallet)
+bool is_valid(std::string_view auth, tools::wallet2& wallet, std::string& error_description)
 {
+	if (!auth.starts_with(BEARER_PART))
+	{
+		error_description = "not bearer token";
+		return false;
+	}
 	if (auto&& [tx,sig] = split_pair(auth.substr(BEARER_PART.size()), ':');
 	    !tx.empty() && !sig.empty())
 	{
-		std::cout << "tx: >>" << tx << "<<\n";
-		std::cout << "sig: >>" << sig << "<<\n";
 		crypto::hash txid;
 		if (!epee::string_tools::hex_to_pod(std::string(tx), txid))
 		{
 			std::cout << tx << " malformed\n";
+			error_description = "malformed txid";
 			return false;
 		}
 		try
 		{
 			wallet.refresh(true);
+			std::cout << "blockchain_current_height: " << wallet.get_blockchain_current_height() << '\n';
 			uint64_t received, confirmations;
 			bool in_pool;
 			bool r = wallet.check_tx_proof(txid,
@@ -70,11 +75,13 @@ bool is_valid(std::string_view auth, tools::wallet2& wallet)
 			if (in_pool)
 			{
 				std::cout << tx << " in pool\n";
+				error_description = "tx in pool";
 				return false;
 			}
 			if (confirmations < 2)
 			{
 				std::cout << tx << " confirmations(" << confirmations << ") < 2\n";
+				error_description = "tx needs 2 confirmations";
 				return false;
 			}
 			std::cout << tx << " received=" << cryptonote::print_money(received) << " confirmations=" << confirmations << std::endl;
@@ -83,10 +90,12 @@ bool is_valid(std::string_view auth, tools::wallet2& wallet)
 		catch (const std::exception& e)
 		{
 			std::cerr << "Error: " << e.what() << std::endl;
+			error_description = e.what();
 			return false;
 		}
 	}
 
+	error_description = "invalid token";
 	return false;
 }
 
@@ -95,12 +104,17 @@ bool is_valid(std::string_view auth, tools::wallet2& wallet)
 std::pair<bool, http::response<http::dynamic_body>>
 validate(const http::request<http::dynamic_body>& req, tools::wallet2& wallet)
 {
+	std::string error_description;
 	if (auto auth_value = req[http::field::authorization];
-	    auth_value.empty() || !auth_value.starts_with(BEARER_PART) || !is_valid(auth_value, wallet))
+	    auth_value.empty() || !is_valid(auth_value, wallet, error_description))
 	{
 		http::response<http::dynamic_body> res{http::status::payment_required, req.version()};
-		std::string auth_res = R"(Bearer address="${address}")";
-		assert(replace_all(auth_res, {{"${address}", wallet.get_address_as_str()}}));
+		std::string auth_res = R"(Bearer realm="xmr402 proxy",currency="XMR",address="${address}")";
+		if (!auth_value.empty() && !error_description.empty())
+		{
+			auth_res += R"(,error="invalid_token",error_description="${error_description}")";
+		}
+		assert(replace_all(auth_res, {{"${address}", wallet.get_address_as_str()},{"${error_description}", error_description}}));
 		res.set(http::field::www_authenticate, auth_res);
 		return {false, res};
 	}
