@@ -40,7 +40,7 @@ bool replace_all(std::string& inout, const std::map<std::string_view,std::string
 	return result;
 }
 
-bool is_valid(std::string_view auth, tools::wallet2& wallet, std::string& error_description)
+bool is_valid(std::string_view auth, tools::wallet2& wallet, const std::string& str_min_amount, std::string& error_description)
 {
 	if (!auth.starts_with(BEARER_PART))
 	{
@@ -84,6 +84,18 @@ bool is_valid(std::string_view auth, tools::wallet2& wallet, std::string& error_
 				error_description = "tx needs 2 confirmations";
 				return false;
 			}
+			uint64_t min_amount;
+			if (!cryptonote::parse_amount(min_amount, str_min_amount))
+			{
+				std::cerr << "Error: parse_amount - " << str_min_amount << std::endl;
+				return false;
+			}
+			if (received < min_amount)
+			{
+				std::cout << tx << " received=" << cryptonote::print_money(received) << " < min_amount=" << cryptonote::print_money(min_amount) << '\n';
+				error_description = "amount received less then minimum " + cryptonote::print_money(min_amount);
+				return false;
+			}
 			std::cout << tx << " received=" << cryptonote::print_money(received) << " confirmations=" << confirmations << std::endl;
 			return r;
 		}
@@ -102,11 +114,11 @@ bool is_valid(std::string_view auth, tools::wallet2& wallet, std::string& error_
 }
 
 std::pair<bool, http::response<http::dynamic_body>>
-validate(const http::request<http::dynamic_body>& req, tools::wallet2& wallet)
+validate(const http::request<http::dynamic_body>& req, tools::wallet2& wallet, const std::string& str_min_amount)
 {
 	std::string error_description;
 	if (auto auth_value = req[http::field::authorization];
-	    auth_value.empty() || !is_valid(auth_value, wallet, error_description))
+	    auth_value.empty() || !is_valid(auth_value, wallet, str_min_amount, error_description))
 	{
 		http::response<http::dynamic_body> res{http::status::payment_required, req.version()};
 		std::string auth_res = R"(Bearer realm="xmr402 proxy",currency="XMR",address="${address}")";
