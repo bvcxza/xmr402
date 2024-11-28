@@ -22,7 +22,7 @@ curl -v http://localhost:8080
 * Closing connection 0
 ```
 
-## Pay minimum XMR amount, [Generate a Transaction Proof](Pay the Server) and Build Authorization Header with Token
+## Pay minimum XMR amount, [Generate a Transaction Proof](#pay-the-server) and Build Authorization Header with Token
 
 ```
 Authorization: Bearer <hex encoded txid>:<tx_proof>
@@ -99,10 +99,9 @@ run 0.0.0.0 8080 127.0.0.1 8000 ~/.local/share/xmr-stagenet-wallets/server 1234 
 curl -v http://127.0.0.1:8080
 ```
 
-### Fund Client Wallet
+### Fund Client Wallet (STAGENET)
 
-https://community.rino.io/faucet/stagenet/
-https://stagenet-faucet.xmr-tw.org/
+Use https://community.rino.io/faucet/stagenet or https://stagenet-faucet.xmr-tw.org
 
 ### Pay the Server
 
@@ -114,6 +113,9 @@ get_tx_proof 59632c9de3453907ada348fe47233d6c6648a2d21b08d716fad54c40ee0c1cac 59
 
 ```
 cat monero_tx_proof ; echo
+```
+```
+Authorization: Bearer <hex encoded txid>:<tx_proof>
 ```
 
 ### Redo the Request with Token
