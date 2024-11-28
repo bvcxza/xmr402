@@ -86,7 +86,7 @@ int main(int argc, char* argv[])
 			std::cerr <<
 				"Usage: xmr402 <in-address> <in-port> <out-address> <out-port> <wallet-file> <wallet-password> <min-amount> [<network-type>] [<node-url>]\n" <<
 				"Example:\n" <<
-				"	 xmr402 0.0.0.0 8080 127.0.0.1 8000 ~/.local/share/haveno-XMR_STAGENET_user1/xmr_stagenet/wallet/haveno_XMR 1234 0.01 STAGENET http://45.63.8.26:38081\n";
+				"	 xmr402 0.0.0.0 8080 127.0.0.1 8000 ~/.local/share/xmr-stagenet-wallets/server 1234 0.01 STAGENET http://45.63.8.26:38081\n";
 			return EXIT_FAILURE;
 		}
 		auto const in_address = asio::ip::make_address(argv[1]);

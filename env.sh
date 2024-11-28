@@ -16,7 +16,12 @@ bld_xmr()
 		make -j$(($(nproc) / 2)) install) && \
 	(cd build_xmr && \
 		cmake --fresh -G Ninja -D BUILD_TESTS=OFF -D STATIC=OFF -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR -D USE_DEVICE_TREZOR=OFF ../external/monero && \
-		ninja -l1.5 wallet && cp lib/*.a $INSTALL_DIR/lib)
+		ninja -l1.5 simplewallet && cp lib/*.a $INSTALL_DIR/lib)
+}
+
+wallet()
+{
+	./build_xmr/bin/monero-wallet-cli $@
 }
 
 cnf()
