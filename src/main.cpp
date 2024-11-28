@@ -28,7 +28,9 @@ do_session(
 	tcp::socket& socket,
 	beast::tcp_stream& out_stream,
 	tools::wallet2& wallet,
-	const std::string& min_amount)
+	const std::string& min_amount,
+	unsigned min_confirmations,
+	unsigned max_confirmations)
 {
 	beast::error_code ec;
 	beast::flat_buffer buffer;
@@ -40,7 +42,7 @@ do_session(
 			http::request<http::dynamic_body> req;
 			http::read(socket, buffer, req);
 
-			if (auto&& [valid,res] = xmr402::validate(req, wallet, min_amount); !valid)
+			if (auto&& [valid,res] = xmr402::validate(req, wallet, min_amount, min_confirmations, max_confirmations); !valid)
 			{
 				http::write(socket, res);
 				break;
@@ -81,12 +83,12 @@ int main(int argc, char* argv[])
 {
 	try
 	{
-		if (argc < 8)
+		if (argc < 10)
 		{
 			std::cerr <<
-				"Usage: xmr402 <in-address> <in-port> <out-address> <out-port> <wallet-file> <wallet-password> <min-amount> [<network-type>] [<node-url>]\n" <<
+				"Usage: xmr402 <in-address> <in-port> <out-address> <out-port> <wallet-file> <wallet-password> <min-amount> <min-confirmations> <max-confirmations> [<network-type>] [<node-url>]\n" <<
 				"Example:\n" <<
-				"	 xmr402 0.0.0.0 8080 127.0.0.1 8000 ~/.local/share/xmr-stagenet-wallets/server 1234 0.01 STAGENET http://45.63.8.26:38081\n";
+				"	 xmr402 0.0.0.0 8080 127.0.0.1 8000 ~/.local/share/xmr-stagenet-wallets/server 1234 0.01 3 150 STAGENET http://45.63.8.26:38081\n";
 			return EXIT_FAILURE;
 		}
 		auto const in_address = asio::ip::make_address(argv[1]);
@@ -96,12 +98,14 @@ int main(int argc, char* argv[])
 		const std::string path = argv[5];
 		const std::string password = argv[6];
 		const std::string min_amount = argv[7];
+		auto const min_confirmations = static_cast<unsigned>(std::atoi(argv[8]));
+		auto const max_confirmations = static_cast<unsigned>(std::atoi(argv[9]));
 
 		cryptonote::network_type network_type = cryptonote::MAINNET;
 		std::string node_url = "http://localhost:18081";
-		if (argc > 8)
+		if (argc > 10)
 		{
-			const std::string str_net_type = argv[8];
+			const std::string str_net_type = argv[10];
 			std::cout << "Warning: network type: " << str_net_type << std::endl;
 			if (str_net_type == "TESTNET") network_type = cryptonote::TESTNET;
 			else if (str_net_type == "STAGENET")
@@ -115,8 +119,8 @@ int main(int argc, char* argv[])
 				return EXIT_FAILURE;
 			}
 		}
-		if (argc == 10)
-			node_url = argv[9];
+		if (argc == 12)
+			node_url = argv[11];
 
 		std::cout << "Info: Node URL: " << node_url << std::endl;
 
@@ -153,7 +157,9 @@ int main(int argc, char* argv[])
 				std::move(in_socket),
 				std::move(out_stream),
 				std::ref(*wallet),
-				std::cref(min_amount))}.detach();
+				std::cref(min_amount),
+				min_confirmations,
+				max_confirmations)}.detach();
 		}
 	}
 	catch (const std::exception& e)

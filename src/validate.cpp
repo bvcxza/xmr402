@@ -40,7 +40,7 @@ bool replace_all(std::string& inout, const std::map<std::string_view,std::string
 	return result;
 }
 
-bool is_valid(std::string_view auth, tools::wallet2& wallet, const std::string& str_min_amount, std::string& error_description)
+bool is_valid(std::string_view auth, tools::wallet2& wallet, const std::string& str_min_amount, unsigned min_confirmations, unsigned max_confirmations, std::string& error_description)
 {
 	if (!auth.starts_with(BEARER_PART))
 	{
@@ -78,10 +78,16 @@ bool is_valid(std::string_view auth, tools::wallet2& wallet, const std::string& 
 				error_description = "tx in pool";
 				return false;
 			}
-			if (confirmations < 2)
+			if (confirmations < min_confirmations)
 			{
-				std::cout << tx << " confirmations(" << confirmations << ") < 2\n";
-				error_description = "tx needs 2 confirmations";
+				std::cout << tx << " confirmations(" << confirmations << ") < " << min_confirmations << '\n';
+				error_description = "tx needs " + std::to_string(min_confirmations) + " confirmations";
+				return false;
+			}
+			if (confirmations > max_confirmations)
+			{
+				std::cout << tx << " confirmations(" << confirmations << ") > " << max_confirmations << '\n';
+				error_description = "token is valid only for " + std::to_string(max_confirmations) + " confirmations";
 				return false;
 			}
 			uint64_t min_amount;
@@ -114,19 +120,25 @@ bool is_valid(std::string_view auth, tools::wallet2& wallet, const std::string& 
 }
 
 std::pair<bool, http::response<http::dynamic_body>>
-validate(const http::request<http::dynamic_body>& req, tools::wallet2& wallet, const std::string& str_min_amount)
+validate(const http::request<http::dynamic_body>& req, tools::wallet2& wallet, const std::string& str_min_amount, unsigned min_confirmations, unsigned max_confirmations)
 {
 	std::string error_description;
 	if (auto auth_value = req[http::field::authorization];
-	    auth_value.empty() || !is_valid(auth_value, wallet, str_min_amount, error_description))
+	    auth_value.empty() || !is_valid(auth_value, wallet, str_min_amount, min_confirmations, max_confirmations, error_description))
 	{
 		http::response<http::dynamic_body> res{http::status::payment_required, req.version()};
-		std::string auth_res = R"(Bearer realm="xmr402 proxy",currency="XMR",address="${address}")";
+		std::string auth_res = R"(Bearer realm="xmr402 proxy",currency="XMR",address="${address}",min_amount="${min_amount}",min_confirmations="${min_confirmations}",max_confirmations="${max_confirmations}")";
 		if (!auth_value.empty() && !error_description.empty())
 		{
 			auth_res += R"(,error="invalid_token",error_description="${error_description}")";
 		}
-		assert(replace_all(auth_res, {{"${address}", wallet.get_address_as_str()},{"${error_description}", error_description}}));
+		assert(replace_all(auth_res, {
+			{"${address}", wallet.get_address_as_str()},
+			{"${min_amount}", str_min_amount},
+			{"${min_confirmations}", std::to_string(min_confirmations)},
+			{"${max_confirmations}", std::to_string(max_confirmations)},
+			{"${error_description}", error_description}
+		}));
 		res.set(http::field::www_authenticate, auth_res);
 		return {false, res};
 	}
