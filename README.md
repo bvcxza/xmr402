@@ -143,6 +143,12 @@ Authorization: Bearer <hex encoded txid>:<tx_proof>
 curl -v -H "Authorization: Bearer 59632c9de3453907ada348fe47233d6c6648a2d21b08d716fad54c40ee0c1cac:OutProofV2jHQwEHcvw8uYSJcCCFzdMZh3odi1uqJXaYUv7aTPg2i8M1XnwSWcuDw5Jz1CzWjBM5QhvnxwkFZT8dhoGZoG3GG6Gx2ki9u2isuTAkncMLGFukMNgYgrzKEZUd9Wyf5e9MCh" http://127.0.0.1:8080
 ```
 
+## Install
+
+```
+cnf -DCMAKE_INSTALL_PREFIX=~/.local && bld install
+```
+
 ## Donations
 
 Please consider donating to support the development of this project.
