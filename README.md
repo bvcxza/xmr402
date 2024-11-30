@@ -1,6 +1,6 @@
 # XMR402
 
-A HTTP [402](https://datatracker.ietf.org/doc/html/rfc7231#section-6.5.2) reverse proxy authentication server that utilizes [Monero](https://www.getmonero.org) Transaction Proof Authentication Token for paid APIs.
+A HTTP [402](https://datatracker.ietf.org/doc/html/rfc7231#section-6.5.2) reverse proxy authentication server that utilizes [Monero](https://www.getmonero.org) Transaction Proof Authentication Token for paid APIs. It uses monero native wallet. No RPC wallet needed.
 
 ## Protocol
 
