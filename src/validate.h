@@ -9,6 +9,7 @@ namespace xmr402
 {
 	std::pair<bool, boost::beast::http::response<boost::beast::http::dynamic_body>>
 	validate(const boost::beast::http::request<boost::beast::http::dynamic_body>& req,
+	         const std::string& auth_scheme,
 	         tools::wallet2& wallet,
 	         const std::string& str_min_amount,
 	         unsigned min_confirmations, unsigned max_confirmations);

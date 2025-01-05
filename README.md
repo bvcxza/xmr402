@@ -109,7 +109,7 @@ python3 -m http.server
 Just enter `run` to show usage.
 
 ```
-run 0.0.0.0 8080 127.0.0.1 8000 ~/.local/share/xmr-stagenet-wallets/server 1234 0.01 3 150 STAGENET http://45.63.8.26:38081
+run 0.0.0.0 8080 127.0.0.1 8000 Bearer ~/.local/share/xmr-stagenet-wallets/server 1234 0.01 3 150 STAGENET http://45.63.8.26:38081
 ```
 
 ### Test No Payment Request

@@ -6,7 +6,9 @@
 #include <utility>
 
 #include <boost/beast/http.hpp>
+#include <boost/algorithm/string/trim.hpp>
 
+#include <string_coding.h> // base64_decode
 #include <wallet/wallet2.h>
 
 namespace xmr402
@@ -16,8 +18,6 @@ namespace http = boost::beast::http;     // from <boost/beast/http.hpp>
 
 namespace
 {
-
-const std::string BEARER_PART = "Bearer ";
 
 std::pair<std::string_view,std::string_view> split_pair(std::string_view str, char delim)
 {
@@ -40,27 +40,39 @@ bool replace_all(std::string& inout, const std::map<std::string_view,std::string
 	return result;
 }
 
-bool is_valid(std::string_view auth, tools::wallet2& wallet, const std::string& str_min_amount, unsigned min_confirmations, unsigned max_confirmations, std::string& error_description)
+bool is_valid(
+	const std::string& auth_scheme,
+	const std::string& auth,
+	tools::wallet2& wallet,
+	const std::string& str_min_amount,
+	unsigned min_confirmations,
+	unsigned max_confirmations,
+	std::string& error_description)
 {
-	if (!auth.starts_with(BEARER_PART))
+	if (!auth.starts_with(auth_scheme))
 	{
-		error_description = "not bearer token";
+		error_description = "incorrect authorization scheme, must be " + auth_scheme;
 		return false;
 	}
-	if (auto&& [tx,sig] = split_pair(auth.substr(BEARER_PART.size()), ':');
+	std::string token = auth.substr(auth_scheme.size());
+	boost::trim(token);
+	if (auth_scheme == "Basic")
+		token = epee::string_encoding::base64_decode(token);
+
+	if (auto&& [tx,sig] = split_pair(token, ':');
 	    !tx.empty() && !sig.empty())
 	{
 		crypto::hash txid;
 		if (!epee::string_tools::hex_to_pod(std::string(tx), txid))
 		{
-			std::cout << tx << " malformed\n";
+			std::cerr << "Error: malformed txid: " << tx << '\n';
 			error_description = "malformed txid";
 			return false;
 		}
 		try
 		{
 			wallet.refresh(true);
-			std::cout << "blockchain_current_height: " << wallet.get_blockchain_current_height() << '\n';
+			std::cout << "Info: blockchain_current_height: " << wallet.get_blockchain_current_height() << '\n';
 			uint64_t received, confirmations;
 			bool in_pool;
 			bool r = wallet.check_tx_proof(txid,
@@ -74,19 +86,19 @@ bool is_valid(std::string_view auth, tools::wallet2& wallet, const std::string& 
 
 			if (in_pool)
 			{
-				std::cout << tx << " in pool\n";
+				std::cerr << "Error: " << tx << " in pool\n";
 				error_description = "tx in pool";
 				return false;
 			}
 			if (confirmations < min_confirmations)
 			{
-				std::cout << tx << " confirmations(" << confirmations << ") < " << min_confirmations << '\n';
+				std::cerr << "Error: " << tx << " confirmations(" << confirmations << ") < " << min_confirmations << '\n';
 				error_description = "tx needs " + std::to_string(min_confirmations) + " confirmations";
 				return false;
 			}
 			if (confirmations > max_confirmations)
 			{
-				std::cout << tx << " confirmations(" << confirmations << ") > " << max_confirmations << '\n';
+				std::cerr << "Error: " << tx << " confirmations(" << confirmations << ") > " << max_confirmations << '\n';
 				error_description = "token is valid only for " + std::to_string(max_confirmations) + " confirmations";
 				return false;
 			}
@@ -98,11 +110,11 @@ bool is_valid(std::string_view auth, tools::wallet2& wallet, const std::string& 
 			}
 			if (received < min_amount)
 			{
-				std::cout << tx << " received=" << cryptonote::print_money(received) << " < min_amount=" << cryptonote::print_money(min_amount) << '\n';
+				std::cerr << "Error: " << tx << " received=" << cryptonote::print_money(received) << " < min_amount=" << cryptonote::print_money(min_amount) << '\n';
 				error_description = "amount received less then minimum " + cryptonote::print_money(min_amount);
 				return false;
 			}
-			std::cout << tx << " received=" << cryptonote::print_money(received) << " confirmations=" << confirmations << std::endl;
+			std::cout << "Info: " << tx << " received=" << cryptonote::print_money(received) << " confirmations=" << confirmations << std::endl;
 			return r;
 		}
 		catch (const std::exception& e)
@@ -120,19 +132,30 @@ bool is_valid(std::string_view auth, tools::wallet2& wallet, const std::string& 
 }
 
 std::pair<bool, http::response<http::dynamic_body>>
-validate(const http::request<http::dynamic_body>& req, tools::wallet2& wallet, const std::string& str_min_amount, unsigned min_confirmations, unsigned max_confirmations)
+validate(
+	const http::request<http::dynamic_body>& req,
+	const std::string& auth_scheme,
+	tools::wallet2& wallet,
+	const std::string& str_min_amount,
+	unsigned min_confirmations,
+	unsigned max_confirmations)
 {
 	std::string error_description;
 	if (auto auth_value = req[http::field::authorization];
-	    auth_value.empty() || !is_valid(auth_value, wallet, str_min_amount, min_confirmations, max_confirmations, error_description))
+	    auth_value.empty() || !is_valid(auth_scheme, auth_value, wallet, str_min_amount, min_confirmations, max_confirmations, error_description))
 	{
-		http::response<http::dynamic_body> res{http::status::payment_required, req.version()};
-		std::string auth_res = R"(Bearer realm="xmr402 proxy",currency="XMR",address="${address}",min_amount="${min_amount}",min_confirmations="${min_confirmations}",max_confirmations="${max_confirmations}")";
+		std::cout << "Debug: auth_value: >>" << auth_value << "<<\n";
+		http::response<http::dynamic_body> res{
+			auth_scheme == "Basic" ? http::status::unauthorized : http::status::payment_required,
+			req.version()
+		};
+		std::string auth_res = R"(${auth_scheme} realm="xmr402 proxy",currency="XMR",address="${address}",min_amount="${min_amount}",min_confirmations="${min_confirmations}",max_confirmations="${max_confirmations}")";
 		if (!auth_value.empty() && !error_description.empty())
 		{
 			auth_res += R"(,error="invalid_token",error_description="${error_description}")";
 		}
 		assert(replace_all(auth_res, {
+			{"${auth_scheme}", auth_scheme},
 			{"${address}", wallet.get_address_as_str()},
 			{"${min_amount}", str_min_amount},
 			{"${min_confirmations}", std::to_string(min_confirmations)},

@@ -27,6 +27,7 @@ void
 do_session(
 	tcp::socket& socket,
 	beast::tcp_stream& out_stream,
+	const std::string& auth_scheme,
 	tools::wallet2& wallet,
 	const std::string& min_amount,
 	unsigned min_confirmations,
@@ -42,7 +43,7 @@ do_session(
 			http::request<http::dynamic_body> req;
 			http::read(socket, buffer, req);
 
-			if (auto&& [valid,res] = xmr402::validate(req, wallet, min_amount, min_confirmations, max_confirmations); !valid)
+			if (auto&& [valid,res] = xmr402::validate(req, auth_scheme, wallet, min_amount, min_confirmations, max_confirmations); !valid)
 			{
 				http::write(socket, res);
 				break;
@@ -83,29 +84,30 @@ int main(int argc, char* argv[])
 {
 	try
 	{
-		if (argc < 10)
+		if (argc < 11)
 		{
 			std::cerr <<
-				"Usage: xmr402 <in-address> <in-port> <out-address> <out-port> <wallet-file> <wallet-password> <min-amount> <min-confirmations> <max-confirmations> [<network-type>] [<node-url>]\n" <<
+				"Usage: xmr402 <in-address> <in-port> <out-address> <out-port> <authentication scheme: Basic or Bearer> <wallet-file> <wallet-password> <min-amount> <min-confirmations> <max-confirmations> [<network-type>] [<node-url>]\n" <<
 				"Example:\n" <<
-				"	 xmr402 0.0.0.0 8080 127.0.0.1 8000 ~/.local/share/xmr-stagenet-wallets/server 1234 0.01 3 150 STAGENET http://45.63.8.26:38081\n";
+				"	 xmr402 0.0.0.0 8080 127.0.0.1 8000 Basic ~/.local/share/xmr-stagenet-wallets/server 1234 0.01 3 150 STAGENET http://45.63.8.26:38081\n";
 			return EXIT_FAILURE;
 		}
 		auto const in_address = asio::ip::make_address(argv[1]);
 		auto const in_port = static_cast<unsigned short>(std::atoi(argv[2]));
 		auto const out_host = argv[3];
 		auto const out_port = argv[4];
-		const std::string path = argv[5];
-		const std::string password = argv[6];
-		const std::string min_amount = argv[7];
-		auto const min_confirmations = static_cast<unsigned>(std::atoi(argv[8]));
-		auto const max_confirmations = static_cast<unsigned>(std::atoi(argv[9]));
+		const std::string auth_scheme = argv[5];
+		const std::string path = argv[6];
+		const std::string password = argv[7];
+		const std::string min_amount = argv[8];
+		auto const min_confirmations = static_cast<unsigned>(std::atoi(argv[9]));
+		auto const max_confirmations = static_cast<unsigned>(std::atoi(argv[10]));
 
 		cryptonote::network_type network_type = cryptonote::MAINNET;
 		std::string node_url = "http://localhost:18081";
-		if (argc > 10)
+		if (argc > 11)
 		{
-			const std::string str_net_type = argv[10];
+			const std::string str_net_type = argv[11];
 			std::cout << "Warning: network type: " << str_net_type << std::endl;
 			if (str_net_type == "TESTNET") network_type = cryptonote::TESTNET;
 			else if (str_net_type == "STAGENET")
@@ -119,10 +121,10 @@ int main(int argc, char* argv[])
 				return EXIT_FAILURE;
 			}
 		}
-		if (argc == 12)
-			node_url = argv[11];
+		if (argc == 13)
+			node_url = argv[12];
 
-		std::cout << "Info: Node URL: " << node_url << std::endl;
+		std::cout << "Info: Node URL: " << node_url << " [" << auth_scheme << ']' << std::endl;
 
 		asio::io_context ioc{1};
 		tcp::acceptor acceptor{ioc, {in_address, in_port}};
@@ -136,7 +138,7 @@ int main(int argc, char* argv[])
 
 		for(;;)
 		{
-			tcp::socket in_socket{ioc};
+			tcp::socket in_socket(ioc);
 
 			// Block until we get a connection
 			acceptor.accept(in_socket);
@@ -156,6 +158,7 @@ int main(int argc, char* argv[])
 				&do_session,
 				std::move(in_socket),
 				std::move(out_stream),
+				std::cref(auth_scheme),
 				std::ref(*wallet),
 				std::cref(min_amount),
 				min_confirmations,
