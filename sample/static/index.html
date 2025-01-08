@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
+		<title>XMR402 Sample</title>
+		<script>
+window.addEventListener('load', () => {
+	function myfetch() {
+		const txid = document.getElementById('txid')
+		const txproof = document.getElementById('txproof')
+		const mode = 'cors'
+		const headers = txid && txproof && txid.value && txproof.value ? {Authorization:'Bearer ' + txid.value + ':' + txproof.value} : {}
+		console.log(headers)
+		// Authorization: Bearer <txid>:<proof>
+		fetch('http://127.0.0.1:8080/data.json', {mode, headers})
+			.then((response) => {
+				if (response.status == 402)
+				{
+					return response.json()
+						.then((data) => {
+							Object.keys(data).forEach((field) => {
+								const span = document.getElementById(field)
+								if (span) span.innerHTML = data[field]
+							})
+						})
+				}
+				else if (response.status == 200)
+				{
+					console.log(response)
+				}
+				else
+				{
+					console.error(response)
+				}
+			})
+	}
+	myfetch()
+	const button = document.getElementById('send')
+	button.addEventListener('click', myfetch)
+})
+		</script>
+	</head>
+	<body>
+		<div id="app">
+			<p><b>Currency</b>: <span id="currency"/></p>
+			<p><b>Payment address</b>: <span id="address"/></p>
+			<p><b>Minimum amount</b>: <span id="min_amount"/></p>
+			<p><b>Minimum of confirmations</b>: <span id="min_confirmations"/></p>
+			<p><b>Maximum of confirmations(validity)</b>: <span id="max_confirmations"/></p>
+			<p><b>Transaction ID(txid)</b>: <input type="text" id="txid" placeholder="Paste here"/></p>
+			<p><b>Transaction Proof(tx_proof)</b>: <input type="text" id="txproof" placeholder="Paste here"/></p>
+			<p><button id="send">Send Proof</button></p>
+			<table id="transactions">
+				<thead><tr><th>height</th><th>subaddr_index</th><th>amount</th><th>is_change</th><th>unlock_time</th><th>txid</th></tr></thead>
+				<tbody/>
+				<tfoot/>
+			</table>
+		</div>
+	</body>
+</html>

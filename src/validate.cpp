@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <iostream>
+#include <map>
 #include <string_view>
 #include <utility>
 
@@ -131,7 +132,7 @@ bool is_valid(
 
 }
 
-std::pair<bool, http::response<http::dynamic_body>>
+std::pair<bool, http::response<http::string_body>>
 validate(
 	const http::request<http::dynamic_body>& req,
 	const std::string& auth_scheme,
@@ -140,29 +141,46 @@ validate(
 	unsigned min_confirmations,
 	unsigned max_confirmations)
 {
+	http::response<http::string_body> res {http::status::ok, req.version()};
+	res.set(http::field::access_control_allow_origin, "*");
+	res.set(http::field::access_control_allow_methods, "*");
+	res.set(http::field::access_control_allow_headers, "Authorization");
+	if (req.method() == http::verb::options)
+		return {false, res};
+
 	std::string error_description;
+	// get address before refresh
+	const std::string wallet_main_address = wallet.get_address_as_str();
 	if (auto auth_value = req[http::field::authorization];
 	    auth_value.empty() || !is_valid(auth_scheme, auth_value, wallet, str_min_amount, min_confirmations, max_confirmations, error_description))
 	{
 		std::cout << "Debug: auth_value: >>" << auth_value << "<<\n";
-		http::response<http::dynamic_body> res{
-			auth_scheme == "Basic" ? http::status::unauthorized : http::status::payment_required,
-			req.version()
-		};
+		if (auth_scheme == "Basic")
+			res.result(http::status::unauthorized);
+		else
+			res.result(http::status::payment_required);
+
 		std::string auth_res = R"(${auth_scheme} realm="xmr402 proxy",currency="XMR",address="${address}",min_amount="${min_amount}",min_confirmations="${min_confirmations}",max_confirmations="${max_confirmations}")";
+		std::string body_res = R"({"realm":"xmr402 proxy","currency":"XMR","address":"${address}","min_amount":"${min_amount}","min_confirmations":"${min_confirmations}","max_confirmations":"${max_confirmations}")";
 		if (!auth_value.empty() && !error_description.empty())
 		{
 			auth_res += R"(,error="invalid_token",error_description="${error_description}")";
+			body_res += R"(,"error":"invalid_token","error_description":"${error_description}")";
 		}
-		assert(replace_all(auth_res, {
+		body_res += "}";
+		const std::map<std::string_view,std::string_view> map = {
 			{"${auth_scheme}", auth_scheme},
-			{"${address}", wallet.get_address_as_str()},
+			{"${address}", wallet_main_address},
 			{"${min_amount}", str_min_amount},
 			{"${min_confirmations}", std::to_string(min_confirmations)},
 			{"${max_confirmations}", std::to_string(max_confirmations)},
 			{"${error_description}", error_description}
-		}));
+		};
+		assert(replace_all(auth_res, map));
+		assert(replace_all(body_res, map));
 		res.set(http::field::www_authenticate, auth_res);
+		res.body() = body_res;
+		res.prepare_payload();
 		return {false, res};
 	}
 	return {true, {}};
