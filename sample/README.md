@@ -2,7 +2,7 @@
 
 ## Build xmr402
 
-[Here](README.md/#build)
+[Here](../README.md/#build)
 
 ## Run web service api
 
