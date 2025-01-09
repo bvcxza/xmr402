@@ -1,8 +1,8 @@
 # Sample of static content access to a web service api protected by xmr402 reverse proxy
 
-## Build and install xmr402
+## Build xmr402
 
-TODO
+[Here](README.md/#build)
 
 ## Run web service api
 
