@@ -11,10 +11,13 @@ window.addEventListener('load', () => {
 		const txproof = document.getElementById('txproof')
 		const mode = 'cors'
 		const headers = txid && txproof && txid.value && txproof.value ? {Authorization:'Bearer ' + txid.value + ':' + txproof.value} : {}
-		console.log(headers)
-		// Authorization: Bearer <txid>:<proof>
+		// Authorization: Bearer <txid>:<txproof>
 		fetch('http://127.0.0.1:8080/data.json', {mode, headers})
 			.then((response) => {
+				const button = document.getElementById('send')
+				button.disabled = response.status == 200
+				const statusSpan = document.getElementById('status')
+				statusSpan.innerHTML = response.statusText
 				if (response.status == 402)
 				{
 					return response.json()
@@ -22,12 +25,23 @@ window.addEventListener('load', () => {
 							Object.keys(data).forEach((field) => {
 								const span = document.getElementById(field)
 								if (span) span.innerHTML = data[field]
+								console.log('%s = %s', field, data[field])
 							})
 						})
 				}
 				else if (response.status == 200)
 				{
-					console.log(response)
+					return response.json()
+						.then((data) => {
+							data.forEach((currency) => {
+								const tbody = document.getElementById('currencies').getElementsByTagName('tbody')[0];
+								var newRow = tbody.insertRow();
+								var codeCell = newRow.insertCell();
+								codeCell.appendChild(document.createTextNode(currency.code));
+								var nameCell = newRow.insertCell();
+								nameCell.appendChild(document.createTextNode(currency.name));
+							})
+						})
 				}
 				else
 				{
@@ -43,16 +57,18 @@ window.addEventListener('load', () => {
 	</head>
 	<body>
 		<div id="app">
+			<p><b>Status</b>: <span id="status"/></p>
+			<p><b>Error</b>: <span id="error_description"/></p>
 			<p><b>Currency</b>: <span id="currency"/></p>
 			<p><b>Payment address</b>: <span id="address"/></p>
 			<p><b>Minimum amount</b>: <span id="min_amount"/></p>
 			<p><b>Minimum of confirmations</b>: <span id="min_confirmations"/></p>
 			<p><b>Maximum of confirmations(validity)</b>: <span id="max_confirmations"/></p>
-			<p><b>Transaction ID(txid)</b>: <input type="text" id="txid" placeholder="Paste here"/></p>
-			<p><b>Transaction Proof(tx_proof)</b>: <input type="text" id="txproof" placeholder="Paste here"/></p>
+			<p><b>Transaction ID(txid)</b>: <input type="text" id="txid" placeholder="Paste here" size="64" maxlength="64" minlength="64"/></p>
+			<p><b>Transaction Proof(tx_proof)</b>: <input type="text" id="txproof" placeholder="Paste here" size="142" maxlength="142" minlength="142"/></p>
 			<p><button id="send">Send Proof</button></p>
-			<table id="transactions">
-				<thead><tr><th>height</th><th>subaddr_index</th><th>amount</th><th>is_change</th><th>unlock_time</th><th>txid</th></tr></thead>
+			<table id="currencies">
+				<thead><tr><th>code</th><th>name</th></tr></thead>
 				<tbody/>
 				<tfoot/>
 			</table>
